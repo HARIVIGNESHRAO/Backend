@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
@@ -9,11 +8,8 @@ const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-
-// Load environment variables
-const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY;
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const mongoURI = process.env.MONGODB_URI;
+const TURNSTILE_SECRET_KEY = '0x4AAAAAAB4cfnEQeR8gN6MDwHfgMITz77c';
+const GOOGLE_CLIENT_ID = '423273358250-5sh66sd211creanihac75uaith2vhh1e.apps.googleusercontent.com';
 
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -22,9 +18,11 @@ app.use(bodyParser.json());
 app.use(cors());
 
 // MongoDB Atlas Connection
+const mongoURI = 'mongodb+srv://harisonu151:zZYoHOEqz8eiI3qP@salaar.st5tm.mongodb.net/musicstream?retryWrites=true&w=majority';
+
 mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => console.log('✅ MongoDB connected successfully'))
-    .catch(err => console.error('❌ MongoDB connection error:', err));
+    .then(() => console.log('MongoDB connected successfully'))
+    .catch(err => console.error('MongoDB connection error:', err));
 
 // User Schema
 const userSchema = new mongoose.Schema({
@@ -51,12 +49,12 @@ const seedAdminUser = async () => {
                 role: 'admin'
             });
             await admin.save();
-            console.log('✅ Admin user created');
+            console.log('Admin user created');
         } else {
-            console.log('ℹ️ Admin user already exists');
+            console.log('Admin user already exists');
         }
     } catch (err) {
-        console.error('❌ Error seeding admin user:', err);
+        console.error('Error seeding admin user:', err);
     }
 };
 seedAdminUser();
@@ -65,19 +63,24 @@ seedAdminUser();
 const isAdmin = async (req, res, next) => {
     try {
         const userId = req.headers['user-id'];
+        console.log('isAdmin middleware: Received user-id:', userId);
         if (!userId) {
+            console.log('isAdmin middleware: User ID missing');
             return res.status(401).json({ message: 'User ID required' });
         }
         const user = await User.findById(userId);
         if (!user) {
+            console.log('isAdmin middleware: User not found for ID:', userId);
             return res.status(404).json({ message: 'User not found' });
         }
         if (user.role !== 'admin') {
+            console.log('isAdmin middleware: User is not admin:', user.username);
             return res.status(403).json({ message: 'Admin access required' });
         }
         req.user = user;
         next();
     } catch (err) {
+        console.error('isAdmin middleware error:', err.message);
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
@@ -125,6 +128,7 @@ app.post('/api/google-login', async (req, res) => {
         }
 
         const { sub: googleId, email, name } = payload;
+
         let user = await User.findOne({ $or: [{ googleId }, { email }] });
 
         if (!user) {
@@ -146,6 +150,7 @@ app.post('/api/google-login', async (req, res) => {
             user: { id: user._id, username: user.username, email: user.email, role: user.role, joinDate: user.joinDate }
         });
     } catch (err) {
+        console.error('Google login error:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
@@ -171,6 +176,7 @@ app.post('/api/signup', async (req, res) => {
             user: { id: newUser._id, username: newUser.username, email: newUser.email, role: newUser.role, joinDate: newUser.joinDate }
         });
     } catch (err) {
+        console.error('Signup error:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
@@ -206,21 +212,24 @@ app.post('/api/login', async (req, res) => {
             user: { id: user._id, username: user.username, email: user.email, role: user.role, joinDate: user.joinDate }
         });
     } catch (err) {
+        console.error('Login error:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
 
-// Get All Users
+// Get All Users (Public endpoint - removed admin authentication)
 app.get('/api/users', async (req, res) => {
     try {
-        const users = await User.find({}, '-password -googleId'); 
+        const users = await User.find({}, '-password -googleId'); // Exclude sensitive fields
+        console.log('Fetched users:', users);
         res.status(200).json(users || []);
     } catch (err) {
+        console.error('Fetch users error:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
 
-// Delete User (Admin only)
+// Delete User (For Admin)
 app.delete('/api/users/:id', isAdmin, async (req, res) => {
     try {
         const userId = req.params.id;
@@ -233,10 +242,11 @@ app.delete('/api/users/:id', isAdmin, async (req, res) => {
         }
         res.status(200).json({ message: 'User deleted successfully' });
     } catch (err) {
+        console.error('Delete user error:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
